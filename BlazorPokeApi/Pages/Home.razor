@@ -1,0 +1,100 @@
+@page "/"
+@using System.Net
+@inject HttpClient Http
+
+<PageTitle>Buscar Pokémon</PageTitle>
+
+<h1>Buscar Pokémon</h1>
+
+<div class="mb-3">
+    <label for="nomePokemon" class="form-label">Nome do Pokémon:</label>
+    <input id="nomePokemon"
+           class="form-control"
+           placeholder="ex.: pikachu"
+           @bind="nomePokemon"
+           @bind:event="oninput"
+           @onkeydown="AoPressionarTecla" />
+</div>
+
+<button class="btn btn-primary" @onclick="BuscarPokemon" disabled="@carregando">
+    Buscar Pokémon
+</button>
+
+<hr />
+
+@if (carregando)
+{
+    <p><em>Carregando...</em></p>
+}
+else if (!string.IsNullOrEmpty(erro))
+{
+    <div class="alert alert-danger" role="alert">@erro</div>
+}
+else if (pokemon is not null)
+{
+    <h3>Detalhes do Pokémon</h3>
+
+    @if (!string.IsNullOrEmpty(pokemon.ImagemUrl))
+    {
+        <img src="@pokemon.ImagemUrl" alt="@pokemon.Name" class="pokemon-img" />
+    }
+
+    <p><strong>ID:</strong> @pokemon.Id</p>
+    <p><strong>Nome:</strong> @pokemon.Name</p>
+    <p><strong>Altura:</strong> @pokemon.AlturaFormatada</p>
+    <p><strong>Peso:</strong> @pokemon.PesoFormatado</p>
+}
+
+@code {
+    private const string UrlBase = "https://pokeapi.co/api/v2/pokemon/";
+
+    private string nomePokemon = string.Empty;
+    private Pokemon? pokemon;
+    private string? erro;
+    private bool carregando;
+
+    private async Task AoPressionarTecla(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+        {
+            await BuscarPokemon();
+        }
+    }
+
+    private async Task BuscarPokemon()
+    {
+        var nome = nomePokemon.Trim().ToLowerInvariant();
+
+        if (nome.Length == 0)
+        {
+            pokemon = null;
+            erro = "Digite o nome de um Pokémon.";
+            return;
+        }
+
+        carregando = true;
+        erro = null;
+        pokemon = null;
+
+        try
+        {
+            pokemon = await Http.GetFromJsonAsync<Pokemon>(UrlBase + Uri.EscapeDataString(nome));
+        }
+        catch (HttpRequestException ex) when (ex.StatusCode == HttpStatusCode.NotFound)
+        {
+            erro = $"Pokémon \"{nomePokemon.Trim()}\" não encontrado.";
+        }
+        catch (HttpRequestException)
+        {
+            erro = "Não foi possível conectar à PokéAPI. Verifique sua conexão com a Internet.";
+        }
+        catch (Exception)
+        {
+            erro = "Ocorreu um erro inesperado ao buscar o Pokémon.";
+        }
+        finally
+        {
+            carregando = false;
+        }
+    }
+}
